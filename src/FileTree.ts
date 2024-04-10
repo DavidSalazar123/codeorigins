@@ -5,30 +5,15 @@ import * as rd from 'readline';
 //! Taken from https://github.com/ThoSe1990/cwt-cucumber-support/blob/main/src/tree_view.ts
 
 export namespace FileTree {
-    //! This it to help determine the line and what file to open
-    class line {
-        readonly text: string;
-        readonly row: number;
-        readonly length: number;
-
-        constructor(text: string, row: number) {
-            this.text = text;
-            this.length = text.length;
-            this.row = row;
-        }
-    }
-
     //! Implements the item that will be within the tree
     class TreeItem extends vscode.TreeItem {
         checked: boolean;
         children: TreeItem[] = [];
-        line: line;
         file: string;
 
-        constructor(fileName: string, line: line) {
+        constructor(fileName: string) {
             super(fileName, vscode.TreeItemCollapsibleState.None)
             this.checked = false;
-            this.line = line;
             this.file = fileName;
             this.collapsibleState = vscode.TreeItemCollapsibleState.None;
             this.updateCheckedStatus();
@@ -84,26 +69,23 @@ export namespace FileTree {
 
         //! Register the commands 
         public constructor() {
-            vscode.commands.registerCommand('CodeOrigins.on_item_clicked', item => this.onItemClicked(item));
-            vscode.commands.registerCommand('CodeOrigins.refresh', () => this.refresh());
+            vscode.commands.registerCommand('CodeOriginsPanel.onItemClicked', item => this.onItemClicked(item));
+            vscode.commands.registerCommand('CodeOriginsPanel.refresh', () => this.refresh());
         }
 
+        //! Need this late for when the item is clicked, we need to show the CodeOrigins
+        //! The goal is to open the file with the "CodeOrigins" overlay
         public onItemClicked(item: TreeItem) {
             if (item.file === undefined) return;
-            vscode.workspace.openTextDocument(item.file).then(document => {
-                vscode.window.showTextDocument(document).then(editor => {
-                    var pos = new vscode.Position(item.line.row - 1, item.line.length);
-                    editor.selection = new vscode.Selection(pos, pos);
-                    editor.revealRange(new vscode.Range(pos, pos));
-                }
-                );
-            });
+            var title = item.label ? item.label.toString() : "";
+            var result = new vscode.TreeItem(title, item.collapsibleState);
+            result.command = { command: "CodeOriginsPanel.onItemClicked", title: title, arguments: [item] }
         }
 
         public getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
             var title = item.label ? item.label.toString() : "";
             var result = new vscode.TreeItem(title, item.collapsibleState);
-            result.command = { command: "CodeOrigins.on_item_clicked", title: title, arguments: [item] }
+            result.command = { command: "CodeOriginsPanel.onItemClicked", title: title, arguments: [item] }
             return result;
         }
 
@@ -120,21 +102,25 @@ export namespace FileTree {
             }
         }
 
-        //! Read directory to obtain the file directory
-        private collectDirectoryFiles(dir: string) {
-            fs.readdirSync(dir).forEach(file => {
-                let filePath = path.join(dir, file);
-                if (fs.statSync(filePath).isDirectory()) {
-                    this.collectDirectoryFiles(filePath)
+        private collectDirectoryFiles(dir: string, parentItem?: TreeItem) {
+            fs.readdirSync(dir, { withFileTypes: true }).forEach(dirent => {
+                const filePath = path.join(dir, dirent.name);
+                const item = new TreeItem(dirent.name);
+
+                if (dirent.isDirectory()) {
+                    this.collectDirectoryFiles(filePath, item);
+                    item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed; 
                 } else {
-                    const label = filePath // At the end, it should just be the file name
-                    const lineCounter = ((i = 1) => () => i++)();
-                    var reader = rd.createInterface(fs.createReadStream(file))
-                    reader.on("line", (currentLine: string, lineNumber: number = lineCounter()) => {
-                        this.Tree.at(-1)?.addChild(new TreeItem(filePath, new line(currentLine, lineNumber)));
-                    });
+                    item.collapsibleState = vscode.TreeItemCollapsibleState.None; 
+                }
+
+                if (parentItem) {
+                    parentItem.addChild(item);
+                } else {
+                    this.Tree.addTreeItem(item);
                 }
             });
+            this.eventEmitter.fire(undefined); // Refresh the list
         }
     }
 }

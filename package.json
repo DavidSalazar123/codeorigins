@@ -9,27 +9,50 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "*"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
-          "id" : "webview-codeorigins",
-          "title" : "CodeOrigins",
-          "icon" : "./assets/codeorigins-icon.jpg"
+          "id": "CodeOrigins-view-container",
+          "title": "CodeOrigins",
+          "icon": "./assets/codeorigins-icon.jpg"
         }
       ]
     },
-    "views" : {
-      "webview-codeorigins": [
+    "views": {
+      "CodeOrigins-view-container": [
         {
-          "type": "webview", 
-          "id": "left-panel-webview",
-          "name": "CodeOrigins Panel",
-          "icon": "./assets/codeorigins-icon.jpg"
+          "id": "CodeOriginsPanel",
+          "name": "CodeOrigins Panel"
         }
-      ] 
+      ]
+    },
+    "commands": [
+      {
+        "command": "CodeOriginsPanel.onItemClicked",
+        "title": "CodeOrigins Tree View Item"
+      },
+      {
+        "command": "CodeOriginsPanel.refresh",
+        "title": "Refresh",
+        "icon": {
+          "light": "src/assets/refresh_light.svg",
+          "dark": "src/assets/refresh_dark.svg"
+        }
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "CodeOriginsPanel.onItemClicked",
+          "when": "view == CodeOrigins",
+          "group": "navigation@0"
+        }
+      ]
     }
   },
   "scripts": {
@@ -43,6 +66,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.6",
     "@types/node": "18.x",
+    "@types/react": "^18.2.75",
     "@types/vscode": "^1.88.0",
     "@typescript-eslint/eslint-plugin": "^7.4.0",
     "@typescript-eslint/parser": "^7.4.0",
@@ -53,7 +77,6 @@
   },
   "dependencies": {
     "@vscode/webview-ui-toolkit": "^1.4.0",
-    "daisyui": "^4.10.1",
     "react": "^18.2.0"
   }
 }

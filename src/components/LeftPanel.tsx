@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
 
-export default function BadgerNews(props) {
+export default function BadgerNews(props: any) {
 
 }
