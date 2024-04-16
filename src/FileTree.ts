@@ -9,14 +9,19 @@ export namespace FileTree {
     class TreeItem extends vscode.TreeItem {
         checked: boolean;
         children: TreeItem[] = [];
-        file: string;
+        fileName: string;
+        filePath: string;
+        iconPath: vscode.ThemeIcon;
+        isFolder: boolean;
 
-        constructor(fileName: string) {
-            super(fileName, vscode.TreeItemCollapsibleState.None)
+        constructor(fileName: string, filePath: string) {
+            super(fileName, vscode.TreeItemCollapsibleState.None);
             this.checked = false;
-            this.file = fileName;
+            this.fileName = fileName;
+            this.filePath = filePath;
+            this.isFolder = false;
             this.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            this.updateCheckedStatus();
+            this.iconPath = new vscode.ThemeIcon("circle-large-outline");
         }
 
         // Append a new file to the children of the file tree viewer
@@ -25,14 +30,11 @@ export namespace FileTree {
             this.children.push(child);
         }
 
-        // Update the checked box 
-        public updateCheckedStatus() {
-            this.iconPath = new vscode.ThemeIcon(this.checked ? "getting-started-item-checked" : "getting-started-item-unchecked")
-        }
-
-        public changeCheckedStatus() {
-            this.checked = !this.checked;
-            this.updateCheckedStatus();
+        public changeIcon() {
+            if (!this.isFolder) {
+                this.checked = !this.checked;
+                this.iconPath = new vscode.ThemeIcon(this.checked ? "circle-large-filled" : "circle-large-outline");
+            }
         }
     }
 
@@ -47,7 +49,7 @@ export namespace FileTree {
 
         // Get the data
         public getData() {
-            return this.data
+            return this.data;
         }
 
         public clearData() {
@@ -62,6 +64,7 @@ export namespace FileTree {
 
     export class TreeViewer implements vscode.TreeDataProvider<TreeItem> {
         private Tree: TreeData = new TreeData();
+        private lastSelected: TreeItem | undefined = undefined;
 
         // Update the tree if there is a change within teh data
         private eventEmitter: vscode.EventEmitter<TreeItem | undefined> = new vscode.EventEmitter<TreeItem | undefined>();
@@ -73,27 +76,32 @@ export namespace FileTree {
             vscode.commands.registerCommand('CodeOriginsPanel.refresh', () => this.refresh());
         }
 
-        //! Need this late for when the item is clicked, we need to show the CodeOrigins
+        //! Need this later for when the item is clicked, we need to show the CodeOrigins
         //! The goal is to open the file with the "CodeOrigins" overlay
         public onItemClicked(item: TreeItem) {
-            if (item.file === undefined) return;
-            var title = item.label ? item.label.toString() : "";
-            var result = new vscode.TreeItem(title, item.collapsibleState);
-            result.command = { command: "CodeOriginsPanel.onItemClicked", title: title, arguments: [item] }
+            if (item.filePath === undefined) { return; }
+            vscode.workspace.openTextDocument(item.filePath).then(document => {
+                if (this.lastSelected !== undefined) { this.lastSelected.changeIcon(); }
+                item.changeIcon();
+                this.lastSelected = item;
+                this.eventEmitter.fire(undefined); // Reload the data
+                vscode.window.showTextDocument(document);
+            });
         }
 
+        //! This is required for the vscode.TreeItem
+        //! Essentially, we are setting it up for vscode and then calling onItemCLiked to actually do something on the click
         public getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
             var title = item.label ? item.label.toString() : "";
-            var result = new vscode.TreeItem(title, item.collapsibleState);
-            result.command = { command: "CodeOriginsPanel.onItemClicked", title: title, arguments: [item] }
-            return result;
+            item.command = { command: "CodeOriginsPanel.onItemClicked", title: title, arguments: [item] };
+            return item;
         }
 
         public getChildren(element: TreeItem | undefined): vscode.ProviderResult<TreeItem[]> {
             return (element === undefined) ? this.Tree.getData() : element.children;
         }
 
-        //! If there is a refresh occuring, we need to reload the directories that we have collected
+        //! If there is a refresh occurring, we need to reload the directories that we have collected
         public refresh() {
             if (vscode.workspace.workspaceFolders) {
                 this.Tree.clearData();
@@ -105,13 +113,15 @@ export namespace FileTree {
         private collectDirectoryFiles(dir: string, parentItem?: TreeItem) {
             fs.readdirSync(dir, { withFileTypes: true }).forEach(dirent => {
                 const filePath = path.join(dir, dirent.name);
-                const item = new TreeItem(dirent.name);
+                const item = new TreeItem(dirent.name, filePath);
 
                 if (dirent.isDirectory()) {
                     this.collectDirectoryFiles(filePath, item);
-                    item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed; 
+                    item.isFolder = true;
+                    item.iconPath = new vscode.ThemeIcon("file-directory");
+                    item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
                 } else {
-                    item.collapsibleState = vscode.TreeItemCollapsibleState.None; 
+                    item.collapsibleState = vscode.TreeItemCollapsibleState.None;
                 }
 
                 if (parentItem) {
