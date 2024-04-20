@@ -28,7 +28,11 @@ enum LogLevel {
 }
 
 class CodeOriginsLogger implements Logger {
+    private readonly filePath;
 
+    constructor(filePath: string) {
+        this.filePath = filePath;
+    }
     // Determine the kind of log
     log(fileName: string, lineStart: string, lineEnd: string, charOffset: number, characterChanges: string): void {
 
