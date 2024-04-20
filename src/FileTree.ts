@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as rd from 'readline';
 //! Taken from https://github.com/ThoSe1990/cwt-cucumber-support/blob/main/src/tree_view.ts
 
 export namespace FileTree {
